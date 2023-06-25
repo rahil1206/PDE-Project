@@ -74,3 +74,34 @@ class Res_Net(nn.Module):
         for layer in self.hidden_layers:
             x = x + self.activation(layer(x))
         return self.output_layer(x)
+    
+class DGM_Net(nn.Module):
+    def __init__(self, input_size, hidden_size, num_hidden_layers, output_size, activation):
+        super().__init__()
+        # DGM network
+        self.L = num_hidden_layers - 1
+        self.activation = activation
+        self.S_1 = nn.Linear(input_size, hidden_size, bias=True)
+        self.Z_U = nn.ModuleList([nn.Linear(input_size, hidden_size, bias=False) for i in range(self.L)])
+        self.Z_W = nn.ModuleList([nn.Linear(hidden_size, hidden_size, bias=True) for i in range(self.L)])
+        self.G_U = nn.ModuleList([nn.Linear(input_size, hidden_size, bias=False) for i in range(self.L)])
+        self.G_W = nn.ModuleList([nn.Linear(hidden_size, hidden_size, bias=True) for i in range(self.L)])
+        self.R_U = nn.ModuleList([nn.Linear(input_size, hidden_size, bias=False) for i in range(self.L)])
+        self.R_W = nn.ModuleList([nn.Linear(hidden_size, hidden_size, bias=True) for i in range(self.L)])
+        self.H_U = nn.ModuleList([nn.Linear(input_size, hidden_size, bias=False) for i in range(self.L)])
+        self.H_W = nn.ModuleList([nn.Linear(hidden_size, hidden_size, bias=True) for i in range(self.L)])
+        self.output_layer = nn.Linear(hidden_size, output_size, bias=True)
+
+    def forward(self, x):
+        # computing S_1
+        S = self.S_1(x)
+        for i in range(self.L):
+            # computing Z_l, G_l, R_l, H_l
+            Z = self.activation(self.Z_U[i](x) + self.Z_W[i](S))
+            G = self.activation(self.G_U[i](x) + self.G_W[i](S))
+            R = self.activation(self.R_U[i](x) + self.R_W[i](S))
+            H = self.activation(self.H_U[i](x) + self.H_W[i](S * R))
+            # computing S_(l+1)
+            S = (1 - G) * H + Z * S
+        return self.output_layer(S)
+
